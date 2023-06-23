@@ -23,9 +23,11 @@ class SamplesVisualisationLogger(pl.Callback):
         self.datamodule = datamodule
 
     def on_validation_end(self, trainer, pl_module):
+        
         val_batch = next(iter(self.datamodule.val_dataloader()))
         sentences = val_batch["sentence"]
-
+        
+        # device on cpu!!! 
         outputs = pl_module(val_batch["input_ids"], val_batch["attention_mask"])
         preds = torch.argmax(outputs.logits, 1)
         labels = val_batch["label"]
@@ -69,11 +71,12 @@ def main(cfg):
     trainer = pl.Trainer(
         max_epochs=cfg.training.max_epochs,
         logger=wandb_logger,
-        callbacks=[checkpoint_callback, SamplesVisualisationLogger(cola_data), early_stopping_callback],
+        # callbacks=[checkpoint_callback, SamplesVisualisationLogger(cola_data), early_stopping_callback],
+        callbacks=[checkpoint_callback, early_stopping_callback],
         log_every_n_steps=cfg.training.log_every_n_steps,
         deterministic=cfg.training.deterministic,
-        # limit_train_batches=cfg.training.limit_train_batches,
-        # limit_val_batches=cfg.training.limit_val_batches,
+        accelerator='gpu',
+        devices=1
     )
     trainer.fit(cola_model, cola_data)
     wandb.finish()

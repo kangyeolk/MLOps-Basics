@@ -21,17 +21,21 @@ class ColaModel(pl.LightningModule):
             model_name, num_labels=2
         )
         self.num_classes = 2
-        self.train_accuracy_metric = torchmetrics.Accuracy()
-        self.val_accuracy_metric = torchmetrics.Accuracy()
-        self.f1_metric = torchmetrics.F1(num_classes=self.num_classes)
+        self.train_accuracy_metric = torchmetrics.Accuracy(task="multiclass", num_classes=self.num_classes)
+        self.val_accuracy_metric = torchmetrics.Accuracy(task="multiclass", num_classes=self.num_classes)
+        self.f1_metric = torchmetrics.F1Score(task="multiclass", num_classes=self.num_classes)
         self.precision_macro_metric = torchmetrics.Precision(
-            average="macro", num_classes=self.num_classes
+            task="multiclass", average="macro", num_classes=self.num_classes
         )
         self.recall_macro_metric = torchmetrics.Recall(
-            average="macro", num_classes=self.num_classes
+            task="multiclass", average="macro", num_classes=self.num_classes
         )
-        self.precision_micro_metric = torchmetrics.Precision(average="micro")
-        self.recall_micro_metric = torchmetrics.Recall(average="micro")
+        self.precision_micro_metric = torchmetrics.Precision(
+            task="multiclass", average="micro", num_classes=self.num_classes
+        )
+        self.recall_micro_metric = torchmetrics.Recall(
+            task="multiclass", average="micro", num_classes=self.num_classes
+        )
 
     def forward(self, input_ids, attention_mask, labels=None):
         outputs = self.bert(
@@ -39,7 +43,7 @@ class ColaModel(pl.LightningModule):
         )
         return outputs
 
-    def training_step(self, batch, batch_idx):
+    def training_step(self, batch, batch_idx):        
         outputs = self.forward(
             batch["input_ids"], batch["attention_mask"], labels=batch["label"]
         )
@@ -76,6 +80,8 @@ class ColaModel(pl.LightningModule):
         return {"labels": labels, "logits": outputs.logits}
 
     def validation_epoch_end(self, outputs):
+        # import pdb; pdb.set_trace()
+
         labels = torch.cat([x["labels"] for x in outputs])
         logits = torch.cat([x["logits"] for x in outputs])
         preds = torch.argmax(logits, 1)
@@ -85,7 +91,7 @@ class ColaModel(pl.LightningModule):
         self.logger.experiment.log(
             {
                 "conf": wandb.plot.confusion_matrix(
-                    probs=logits.numpy(), y_true=labels.numpy()
+                    probs=logits.cpu().numpy(), y_true=labels.cpu().numpy()
                 )
             }
         )
